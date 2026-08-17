@@ -1,5 +1,5 @@
 from agents.base_agent import BaseAgent
-from core.state import AgentState
+from core.state import AgentState, ensure_state_defaults
 from core.graph import GraphExecutor
 
 class AgentRuntime:
@@ -16,6 +16,7 @@ class AgentRuntime:
             agent.initialize()
 
     def run(self, state:AgentState):
+        state = ensure_state_defaults(state)
 
         return self.graph.invoke(state)
 

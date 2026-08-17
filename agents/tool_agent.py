@@ -6,11 +6,18 @@ from core.schema import tool_schema
 from core.tool_executor import ToolExecutor
 from core.tool_registry import ToolRegistry
 from core.state import AgentState
+from core.message import Message
 
 class ToolAgent(BaseAgent):
 
-    def __init__(self, name="tool_agent", tool_registry:ToolRegistry=None, tool_executor:ToolExecutor=None):
-        super().__init__(name)
+    def __init__(
+        self,
+        name="tool_agent",
+        tool_registry:ToolRegistry=None,
+        tool_executor:ToolExecutor=None,
+        description="负责需要调用工具完成的任务，例如数学计算、函数调用和外部工具执行"
+    ):
+        super().__init__(name, description)
         self.llm = ChatLLM()
         self.tool_registry = tool_registry
         self.tool_executor = tool_executor
@@ -18,10 +25,25 @@ class ToolAgent(BaseAgent):
     def run(self, state:AgentState):
 
         current_task = state["current_task"]
+        if current_task is None:
+            description = state["task"]
+            if not description and state["messages"]:
+                description = state["messages"][-1].content
+
+            current_task = {
+                "name": state["task"] or "tool_task",
+                "description": description
+            }
+            state["current_task"] = current_task
 
         schemas = []
 
-        for tool in self.tool_registry.tools.values():
+        if self.tool_registry is None:
+            raise ValueError("ToolAgent requires a tool_registry")
+        if self.tool_executor is None:
+            raise ValueError("ToolAgent requires a tool_executor")
+
+        for tool in self.tool_registry.list_tools():
             schemas.append(tool_schema(tool))
 
         messages = [
@@ -36,6 +58,24 @@ class ToolAgent(BaseAgent):
         ]
 
         response = self.llm.invoke(messages, tools=schemas)
+
+        if not response.tool_calls:
+            result = response.content or "没有选择可执行工具"
+            state["result"] = result
+            state["task_results"].append(
+                {
+                    "task": current_task["name"],
+                    "agent": self.name,
+                    "result": result
+                }
+            )
+            state["messages"].append(
+                Message(
+                    role="assistant",
+                    content=result
+                )
+            )
+            return state
 
         tool_call = response.tool_calls[0]
 
@@ -52,6 +92,7 @@ class ToolAgent(BaseAgent):
         )
 
         result = str(tool_result)
+        state["result"] = result
 
         state["task_results"].append(
             {
@@ -59,6 +100,12 @@ class ToolAgent(BaseAgent):
                 "agent": self.name,
                 "result": result
             }
+        )
+        state["messages"].append(
+            Message(
+                role="assistant",
+                content=result
+            )
         )
 
         return state

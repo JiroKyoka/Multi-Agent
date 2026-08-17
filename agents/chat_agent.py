@@ -8,8 +8,8 @@ import json
 
 class ChatAgent(BaseAgent):
 
-    def __init__(self, name="chat_agent"):
-        super().__init__(name)
+    def __init__(self, name="chat_agent", description="负责普通问答、解释、总结和不需要工具的文本任务"):
+        super().__init__(name, description)
         self.llm = ChatLLM()
 
     def run(self, state:AgentState):

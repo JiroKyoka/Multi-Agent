@@ -1,60 +1,45 @@
 from core.runtime import AgentRuntime
-from agents.chat_agent import ChatAgent
 from core.message import Message
 from core.state import AgentState
 from core.graph import StateGraph
 from agents.lead_agent import LeadAgent
 from agents.planner_agent import PlannerAgent
-from tools.calculator import CalculatorTool
-from core.tool_registry import ToolRegistry
-from core.tool_executor import ToolExecutor
-from rag.init_retriever import init_rag
-from tools.need_rag import RAGTool
+from agents.init_sub_agent import init_sub_agent
+from tools.init_tools import init_tools
 
-tool_registry = ToolRegistry()
+tool_registry, tool_executor = init_tools()
+agent_registry = init_sub_agent(tool_registry, tool_executor)
 
-
-
-tool_registry.register(
-    CalculatorTool()
+planner_agent = PlannerAgent(
+    agent_specs=agent_registry.list_specs()
 )
-
-retriever = init_rag("paper.txt")
-
-tool_registry.register(
-    RAGTool(retriever)
-)
-
-tool_executor = ToolExecutor(tool_registry)
-
-chat_agent = ChatAgent(
-    "chat_agent"
-)
-planner_agent = PlannerAgent()
-lead_agent = LeadAgent(planner_agent)
+lead_agent = LeadAgent(planner_agent, agent_registry)
 
 graph = StateGraph()
 
-graph.add_node("chat", chat_agent.run)
-#graph.add_node("lead", lead_agent.run)
+graph.add_node("lead", lead_agent.run)
 
-graph.add_edge("start", "chat")
-graph.add_edge("chat", "end")
+graph.add_edge("start", "lead")
+graph.add_edge("lead", "end")
 
 executor = graph.compile()
 
 runtime = AgentRuntime(executor)
 
+user_task = "计算100+30"
+
 state = AgentState(
-    task="",
+    task=user_task,
     messages=[
         Message(
             role="user",
-            content="计算100+30"
+            content=user_task
         )
     ],
     result="",
-    plan=None
+    plan=None,
+    current_task=None,
+    task_results=[]
 )
 
 runtime.startup()

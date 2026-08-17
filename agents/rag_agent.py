@@ -1,7 +1,8 @@
 from agents.base_agent import BaseAgent
 from models.llm import ChatLLM
 from core.message import Message
-from rag.retriever import BaseRetriever
+from core.state import AgentState
+from rag.base import BaseRetriever
 from memory.store import SQLiteMemoryStore
 from context.manager import ContextManager
 
@@ -14,10 +15,26 @@ class RAGAgent(BaseAgent):
         self.context_manager = context_manager
         self.memory_store = memory_store
 
-    def run(self, state):
+    def run(self, state: AgentState):
 
         current_task = state["current_task"]
+        if current_task is None:
+            description = state["task"]
+            if not description and state["messages"]:
+                description = state["messages"][-1].content
 
+            current_task = {
+                "name": state["task"] or "rag_task",
+                "description": description
+            }
+            state["current_task"] = current_task
+
+        if self.retriever is None:
+            raise ValueError("RAGAgent requires a retriever")
+        if self.context_manager is None:
+            raise ValueError("RAGAgent requires a context_manager")
+        if self.memory_store is None:
+            raise ValueError("RAGAgent requires a memory_store")
 
         query = current_task["description"] # 此处还没有规定子任务的字典构成
 
@@ -32,12 +49,13 @@ class RAGAgent(BaseAgent):
         )
         messages.append({
             "role": "user",
-            "content": "query"
+            "content": query
         })
 
         response = self.llm.invoke(messages)
 
         result = response.content
+        state["result"] = result
 
         state["task_results"].append( # 此处还没规定子任务结果的构成字典
             {
@@ -46,7 +64,11 @@ class RAGAgent(BaseAgent):
                 "result": result
             }
         )
+        state["messages"].append(
+            Message(
+                role="assistant",
+                content=result
+            )
+        )
 
         return state
-
-
