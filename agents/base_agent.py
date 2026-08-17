@@ -3,11 +3,8 @@ from core.state import AgentState
 
 class BaseAgent(ABC):
 
-    def __init__(self, name:str, llm=None, tools=None, memory=None):
+    def __init__(self, name:str):
         self.name = name
-        self.llm = llm
-        self.tools = tools
-        self.memory = memory
 
     @abstractmethod
     def run(self, state:AgentState):

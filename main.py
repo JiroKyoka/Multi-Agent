@@ -28,9 +28,7 @@ tool_registry.register(
 tool_executor = ToolExecutor(tool_registry)
 
 chat_agent = ChatAgent(
-    "chat_agent",
-    tool_registry,
-    tool_executor
+    "chat_agent"
 )
 planner_agent = PlannerAgent()
 lead_agent = LeadAgent(planner_agent)

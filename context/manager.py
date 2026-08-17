@@ -1,8 +1,10 @@
+from context.token_counter import TokenCounter
+
 class ContextManager:
 
     def __init__(
         self,
-        token_counter,
+        token_counter :TokenCounter,
         max_context_tokens=12000,
         reserved_response_tokens=1500,
         memory_budget=1500,
@@ -125,49 +127,49 @@ class ContextManager:
         memories,
         documents
     ):
-        selected_memories = (
+        selected_memories = ( # 获取预先规定的token数量的记忆
             self.select_memories(
                 memories
             )
         )
 
-        selected_documents = (
+        selected_documents = ( # 获取预先规定的token数量的rag检索文献
             self.select_documents(
                 documents
             )
         )
 
-        memory_text = (
+        memory_text = ( # 整合记忆成为一个大字符串
             self.build_memory_text(
                 selected_memories
             )
         )
 
-        document_text = (
+        document_text = ( # 整合rag数据成一个大字符串
             self.build_document_text(
                 selected_documents
             )
         )
 
-        system_tokens = (
+        system_tokens = ( # 计算系统提示词的token
             self.token_counter.count_text(
                 system_prompt
             )
         )
 
-        memory_tokens = (
+        memory_tokens = ( # 计算记忆的token
             self.token_counter.count_text(
                 memory_text
             )
         )
 
-        document_tokens = (
+        document_tokens = ( # 计算数据库的token
             self.token_counter.count_text(
                 document_text
             )
         )
 
-        input_budget = (
+        input_budget = ( # 计算输入
             self.max_context_tokens
             - self.reserved_response_tokens
         )
@@ -179,19 +181,19 @@ class ContextManager:
             - document_tokens
         )
 
-        message_budget = max(
+        message_budget = max( # 计算剩余token预算
             message_budget,
             0
         )
 
-        selected_messages = (
+        selected_messages = ( # 获取最大上文message
             self.select_messages(
                 messages,
                 message_budget
             )
         )
 
-        final_messages = [
+        final_messages = [ # 开始整合message
             {
                 "role": "system",
                 "content": system_prompt

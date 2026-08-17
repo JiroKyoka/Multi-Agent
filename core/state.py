@@ -7,3 +7,5 @@ class AgentState(TypedDict):
     messages : List[Message]
     result : str
     plan : TaskPlan
+    current_task : dict | None
+    task_results : List[dict]
