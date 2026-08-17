@@ -1,7 +1,7 @@
 from core.runtime import AgentRuntime
 from core.message import Message
 from core.state import AgentState
-from core.graph import StateGraph
+from core.loop import AgentLoop
 from agents.lead_agent import LeadAgent
 from agents.planner_agent import PlannerAgent
 from agents.init_sub_agent import init_sub_agent
@@ -15,16 +15,8 @@ planner_agent = PlannerAgent(
 )
 lead_agent = LeadAgent(planner_agent, agent_registry)
 
-graph = StateGraph()
-
-graph.add_node("lead", lead_agent.run)
-
-graph.add_edge("start", "lead")
-graph.add_edge("lead", "end")
-
-executor = graph.compile()
-
-runtime = AgentRuntime(executor)
+loop = AgentLoop(lead_agent)
+runtime = AgentRuntime(loop=loop)
 
 user_task = "计算100+30"
 

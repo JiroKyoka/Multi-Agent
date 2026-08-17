@@ -1,12 +1,14 @@
 from agents.base_agent import BaseAgent
-from core.state import AgentState, ensure_state_defaults
 from core.graph import GraphExecutor
+from core.loop import AgentLoop
+from core.state import AgentState, ensure_state_defaults
 
 class AgentRuntime:
 
-    def __init__(self, graph:GraphExecutor=None):
+    def __init__(self, graph:GraphExecutor=None, loop:AgentLoop=None):
         self.agent:dict[str, BaseAgent] = {}
         self.graph:GraphExecutor = graph
+        self.loop:AgentLoop = loop
 
     #def register_agent(self, agent:BaseAgent):  链式时使用的方法，固定流程
     #    self.agent[agent.name] = agent
@@ -18,7 +20,13 @@ class AgentRuntime:
     def run(self, state:AgentState):
         state = ensure_state_defaults(state)
 
-        return self.graph.invoke(state)
+        if self.loop:
+            return self.loop.run(state)
+
+        if self.graph:
+            return self.graph.invoke(state)
+
+        raise ValueError("AgentRuntime requires a loop or graph")
 
     def shutdown(self):
         for agent in self.agent.values():
