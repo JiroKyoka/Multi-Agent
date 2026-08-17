@@ -2,36 +2,229 @@ class ContextManager:
 
     def __init__(
         self,
-        max_messages=10,
-        max_memories=5,
-        max_documents=3
+        token_counter,
+        max_context_tokens=12000,
+        reserved_response_tokens=1500,
+        memory_budget=1500,
+        document_budget=4000
     ):
-        self.max_messages = max_messages
+        self.token_counter = token_counter
+        self.max_context_tokens = max_context_tokens
+        self.reserved_response_tokens = reserved_response_tokens
+        self.memory_budget = memory_budget
+        self.document_budget = document_budget
 
-        self.max_memories = max_memories
+    def select_memories(self, memories):
+        selected = []
+        used_tokens = 0
 
-        self.max_documents = max_documents
+        for memory in reversed(memories):
+            tokens = self.token_counter.count_text(
+                memory.content
+            )
+
+            if (
+                used_tokens + tokens
+                > self.memory_budget
+            ):
+                continue
+
+            selected.append(memory)
+            used_tokens += tokens
+
+        selected.reverse()
+
+        return selected
+
+    def select_documents(self, documents):
+        selected = []
+        used_tokens = 0
+
+        for document in documents:
+            tokens = self.token_counter.count_text(
+                document.content
+            )
+
+            if (
+                used_tokens + tokens
+                > self.document_budget
+            ):
+                continue
+
+            selected.append(document)
+            used_tokens += tokens
+
+        return selected
 
     def select_messages(
         self,
-        messages
+        messages,
+        available_tokens
     ):
-        return messages[
-            -self.max_messages:
-        ]
+        selected = []
+        used_tokens = 0
 
-    def select_memories(
+        for message in reversed(messages):
+            tokens = self.token_counter.count_text(
+                message.content
+            )
+
+            if (
+                used_tokens + tokens
+                > available_tokens
+            ):
+                continue
+
+            selected.append(message)
+            used_tokens += tokens
+
+        selected.reverse()
+
+        return selected
+
+    def build_memory_text(
         self,
         memories
     ):
-        return memories[
-            -self.max_memories:
-        ]
+        if not memories:
+            return ""
 
-    def select_documents(
+        parts = []
+
+        for memory in memories:
+            parts.append(
+                f"- {memory.content}"
+            )
+
+        return "\n".join(parts)
+
+    def build_document_text(
         self,
         documents
     ):
-        return documents[
-            :self.max_documents
+        if not documents:
+            return ""
+
+        parts = []
+
+        for index, document in enumerate(
+            documents,
+            start=1
+        ):
+            parts.append(
+                f"[参考资料{index}]\n"
+                f"{document.content}"
+            )
+
+        return "\n\n".join(parts)
+
+    def build(
+        self,
+        system_prompt,
+        messages,
+        memories,
+        documents
+    ):
+        selected_memories = (
+            self.select_memories(
+                memories
+            )
+        )
+
+        selected_documents = (
+            self.select_documents(
+                documents
+            )
+        )
+
+        memory_text = (
+            self.build_memory_text(
+                selected_memories
+            )
+        )
+
+        document_text = (
+            self.build_document_text(
+                selected_documents
+            )
+        )
+
+        system_tokens = (
+            self.token_counter.count_text(
+                system_prompt
+            )
+        )
+
+        memory_tokens = (
+            self.token_counter.count_text(
+                memory_text
+            )
+        )
+
+        document_tokens = (
+            self.token_counter.count_text(
+                document_text
+            )
+        )
+
+        input_budget = (
+            self.max_context_tokens
+            - self.reserved_response_tokens
+        )
+
+        message_budget = (
+            input_budget
+            - system_tokens
+            - memory_tokens
+            - document_tokens
+        )
+
+        message_budget = max(
+            message_budget,
+            0
+        )
+
+        selected_messages = (
+            self.select_messages(
+                messages,
+                message_budget
+            )
+        )
+
+        final_messages = [
+            {
+                "role": "system",
+                "content": system_prompt
+            }
         ]
+
+        if memory_text:
+            final_messages.append(
+                {
+                    "role": "system",
+                    "content":
+                        "以下是长期记忆：\n\n"
+                        f"{memory_text}"
+                }
+            )
+
+        if document_text:
+            final_messages.append(
+                {
+                    "role": "system",
+                    "content":
+                        "以下是与当前任务相关的"
+                        "知识库资料：\n\n"
+                        f"{document_text}"
+                }
+            )
+
+        for message in selected_messages:
+            final_messages.append(
+                {
+                    "role": message.role,
+                    "content": message.content
+                }
+            )
+
+        return final_messages
